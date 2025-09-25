@@ -55,7 +55,7 @@ fig = px.line()
 for lev in LEVERAGES:
     fig.add_scatter(
         x=df["createdOn"],
-        y=(df[f"net_apy_x{lev}"] * 100).round(2),  # nhân 100, làm tròn 2 chữ số
+        y=(df[f"net_apy_x{lev}"] * 100).round(2),
         mode="lines",
         name=f"x{lev}"
     )
@@ -69,21 +69,16 @@ st.plotly_chart(fig, use_container_width=True)
 # ========== TABS BẢNG ==========
 tab_all, tab_negative = st.tabs(["All Data", "Negative Net APY"])
 
-# Các cột hiển thị
 display_cols = ["createdOn", "apy", "borrowAPY"] + [f"net_apy_x{lev}" for lev in LEVERAGES]
-
-# Copy dữ liệu, nhân 100 và làm tròn
 df_display = df[display_cols].copy()
 df_display["apy"] = (df_display["apy"] * 100).round(2)
 df_display["borrowAPY"] = (df_display["borrowAPY"] * 100).round(2)
 for lev in LEVERAGES:
     df_display[f"net_apy_x{lev}"] = (df_display[f"net_apy_x{lev}"] * 100).round(2)
 
-# Chuyển sang string để hiển thị chính xác 2 chữ số
 for col in ["apy", "borrowAPY"] + [f"net_apy_x{lev}" for lev in LEVERAGES]:
     df_display[col] = df_display[col].map(lambda x: f"{x:.2f}")
 
-# Hàm highlight Net APY âm
 def highlight_negative(val):
     try:
         if float(val) < 0:
@@ -92,7 +87,6 @@ def highlight_negative(val):
         pass
     return "color: black"
 
-# Hiển thị bảng All Data
 with tab_all:
     st.dataframe(
         df_display.style.applymap(
@@ -102,7 +96,6 @@ with tab_all:
         height=400
     )
 
-# Bảng Net APY âm
 neg_display = df_display[
     df_display[[f"net_apy_x{lev}" for lev in LEVERAGES]].apply(lambda x: x.astype(float) < 0).any(axis=1)
 ].copy()
@@ -125,21 +118,16 @@ with col1:
 with col2:
     end_date = st.date_input("Ngày kết thúc", value=df["createdOn"].max().date())
 
-# Lọc dữ liệu theo khoảng thời gian
 mask = (df["createdOn"].dt.date >= start_date) & (df["createdOn"].dt.date <= end_date)
 df_filtered = df.loc[mask].copy()
 
 if not df_filtered.empty:
     df_filtered.set_index("createdOn", inplace=True)
 
-    # Chỉ lấy các cột numeric
     numeric_cols = ["apy", "borrowAPY"] + [f"net_apy_x{lev}" for lev in LEVERAGES]
     df_daily = df_filtered[numeric_cols].resample("1D").mean()
-
-    # Nhân 100 và làm tròn 2 chữ số
     df_daily = (df_daily * 100).round(2)
 
-    # Vẽ line chart Net APY theo leverage
     fig_avg = px.line(df_daily, x=df_daily.index, y=[f"net_apy_x{lev}" for lev in LEVERAGES])
     fig_avg.update_layout(
         title=f"Net APY trung bình theo ngày từ {start_date} đến {end_date}",
@@ -156,10 +144,55 @@ st.subheader("Net APY trung bình trong khoảng thời gian đã chọn")
 if not df_filtered.empty:
     avg_net_apy = {}
     for lev in LEVERAGES:
-        avg_val = df_filtered[f"net_apy_x{lev}"].mean() * 100  # nhân 100
-        avg_net_apy[f"x{lev}"] = round(avg_val, 2)           # làm tròn 2 chữ số
+        avg_val = df_filtered[f"net_apy_x{lev}"].mean() * 100
+        avg_net_apy[f"x{lev}"] = round(avg_val, 2)
 
     avg_df = pd.DataFrame([avg_net_apy])
     st.table(avg_df)
 else:
     st.info("Không có dữ liệu trong khoảng thời gian này.")
+
+# ========== LỢI NHUẬN SO SÁNH JLP vs SOL (NHẬP TAY GIÁ VÀ NGÀY RIÊNG) ==========
+st.subheader("Profit Comparison: JLP vs SOL (Nhập tay ngày và giá)")
+
+col1, col2 = st.columns(2)
+with col1:
+    start_profit_date = st.date_input("Ngày bắt đầu cho Profit", value=df["createdOn"].min().date(), key="profit_start")
+with col2:
+    end_profit_date = st.date_input("Ngày kết thúc cho Profit", value=df["createdOn"].max().date(), key="profit_end")
+
+st.markdown("### Giá JLP")
+start_jlp_price = st.number_input(f"Giá JLP lúc {start_profit_date}", min_value=0.0, value=1.0, step=0.01)
+end_jlp_price = st.number_input(f"Giá JLP lúc {end_profit_date}", min_value=0.0, value=1.0, step=0.01)
+
+st.markdown("### Giá SOL")
+start_sol_price = st.number_input(f"Giá SOL lúc {start_profit_date}", min_value=0.0, value=20.0, step=0.01)
+end_sol_price = st.number_input(f"Giá SOL lúc {end_profit_date}", min_value=0.0, value=20.0, step=0.01)
+
+# APY trung bình SOL (linear giả định 20%)
+apy_sol = st.number_input("APY trung bình của SOL (%)", min_value=0.0, value=20.0, step=0.1) / 100.0
+
+# Tính APY trung bình JLP trong khoảng ngày profit
+mask_profit = (df["createdOn"].dt.date >= start_profit_date) & (df["createdOn"].dt.date <= end_profit_date)
+df_profit_period = df.loc[mask_profit].copy()
+
+if not df_profit_period.empty:
+    avg_net_apy_profit = {}
+    for lev in LEVERAGES:
+        avg_val = df_profit_period[f"net_apy_x{lev}"].mean() * 100
+        avg_net_apy_profit[f"x{lev}"] = round(avg_val, 2)
+
+    # Tính lợi nhuận cuối kỳ = price change * (1 + APY)
+    profits = {}
+    for lev in LEVERAGES:
+        profits[f"JLP x{lev}"] = (end_jlp_price / start_jlp_price) * (1 + avg_net_apy_profit[f"x{lev}"]/100)
+    profits["SOL"] = (end_sol_price / start_sol_price) * (1 + apy_sol)
+
+    df_profit = pd.DataFrame({"Asset": list(profits.keys()), "Return": list(profits.values())})
+
+    fig_profit = px.bar(df_profit, x="Asset", y="Return", text="Return")
+    fig_profit.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+    fig_profit.update_layout(title=f"Lợi nhuận từ {start_profit_date} đến {end_profit_date}", yaxis_title="Tỷ lệ lợi nhuận")
+    st.plotly_chart(fig_profit, use_container_width=True)
+else:
+    st.info("Không có dữ liệu JLP trong khoảng thời gian này để tính APY trung bình.")
