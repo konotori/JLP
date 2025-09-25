@@ -2,11 +2,23 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-from datetime import date
+from datetime import date, timedelta
 
 # ========== CONFIG ==========
-JLP_API = "https://api.kamino.finance/yields/5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq/history?start=2024-09-25&end=2025-09-26"
-USDC_API = "https://api.kamino.finance/kamino-market/DxXdAyU3kCjnyggvHmY5nAwg5cRbbmdyX3npfDMjjMek/reserves/Ga4rZytCpq1unD4DbEJ5bkHeUz9g3oh9AAFEi6vSauXp/metrics/history?env=mainnet-beta&start=2024-09-25&end=2025-09-26&frequency=hour"
+# Ngày hôm nay
+today = date.today()
+# Ngày mai để bao gồm cả hôm nay
+end_date = today + timedelta(days=1)
+# 1 năm trước
+start_date = end_date - timedelta(days=365)
+
+# Chuyển sang định dạng YYYY-MM-DD
+start_str = start_date.strftime("%Y-%m-%d")
+end_str = end_date.strftime("%Y-%m-%d")
+
+# URLs với khoảng thời gian động
+JLP_API = f"https://api.kamino.finance/yields/5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq/history?start={start_str}&end={end_str}"
+USDC_API = f"https://api.kamino.finance/kamino-market/DxXdAyU3kCjnyggvHmY5nAwg5cRbbmdyX3npfDMjjMek/reserves/Ga4rZytCpq1unD4DbEJ5bkHeUz9g3oh9AAFEi6vSauXp/metrics/history?env=mainnet-beta&start={start_str}&end={end_str}&frequency=hour"
 
 LEVERAGES = [2.4, 3.7, 5.0, 6.2]
 
