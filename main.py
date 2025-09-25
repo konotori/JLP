@@ -149,3 +149,17 @@ if not df_filtered.empty:
     st.plotly_chart(fig_avg, use_container_width=True)
 else:
     st.info("Không có dữ liệu trong khoảng thời gian này.")
+
+# ========== NET APY TRUNG BÌNH TRONG KHOẢNG THỜI GIAN ==========
+st.subheader("Net APY trung bình trong khoảng thời gian đã chọn")
+
+if not df_filtered.empty:
+    avg_net_apy = {}
+    for lev in LEVERAGES:
+        avg_val = df_filtered[f"net_apy_x{lev}"].mean() * 100  # nhân 100
+        avg_net_apy[f"x{lev}"] = round(avg_val, 2)           # làm tròn 2 chữ số
+
+    avg_df = pd.DataFrame([avg_net_apy])
+    st.table(avg_df)
+else:
+    st.info("Không có dữ liệu trong khoảng thời gian này.")
