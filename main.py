@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+from datetime import date
 
 # ========== CONFIG ==========
 JLP_API = "https://api.kamino.finance/yields/5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq/history?start=2024-09-25&end=2025-09-26"
@@ -54,13 +55,13 @@ fig = px.line()
 for lev in LEVERAGES:
     fig.add_scatter(
         x=df["createdOn"],
-        y=df[f"net_apy_x{lev}"].round(2),  # làm tròn 2 chữ số
+        y=(df[f"net_apy_x{lev}"] * 100).round(2),  # nhân 100, làm tròn 2 chữ số
         mode="lines",
         name=f"x{lev}"
     )
 
 fig.update_layout(
-    yaxis_title="Net APY",
+    yaxis_title="Net APY (%)",
     xaxis_title="Time"
 )
 st.plotly_chart(fig, use_container_width=True)
@@ -71,7 +72,7 @@ tab_all, tab_negative = st.tabs(["All Data", "Negative Net APY"])
 # Các cột hiển thị
 display_cols = ["createdOn", "apy", "borrowAPY"] + [f"net_apy_x{lev}" for lev in LEVERAGES]
 
-# Copy dữ liệu và tính Net APY nhân 100, làm tròn
+# Copy dữ liệu, nhân 100 và làm tròn
 df_display = df[display_cols].copy()
 df_display["apy"] = (df_display["apy"] * 100).round(2)
 df_display["borrowAPY"] = (df_display["borrowAPY"] * 100).round(2)
@@ -114,3 +115,37 @@ with tab_negative:
         ),
         height=400
     )
+
+# ========== AVERAGE NET APY THEO NGÀY ==========
+st.subheader("Average Net APY theo ngày theo từng leverage")
+
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("Ngày bắt đầu", value=df["createdOn"].min().date())
+with col2:
+    end_date = st.date_input("Ngày kết thúc", value=df["createdOn"].max().date())
+
+# Lọc dữ liệu theo khoảng thời gian
+mask = (df["createdOn"].dt.date >= start_date) & (df["createdOn"].dt.date <= end_date)
+df_filtered = df.loc[mask].copy()
+
+if not df_filtered.empty:
+    df_filtered.set_index("createdOn", inplace=True)
+
+    # Chỉ lấy các cột numeric
+    numeric_cols = ["apy", "borrowAPY"] + [f"net_apy_x{lev}" for lev in LEVERAGES]
+    df_daily = df_filtered[numeric_cols].resample("1D").mean()
+
+    # Nhân 100 và làm tròn 2 chữ số
+    df_daily = (df_daily * 100).round(2)
+
+    # Vẽ line chart Net APY theo leverage
+    fig_avg = px.line(df_daily, x=df_daily.index, y=[f"net_apy_x{lev}" for lev in LEVERAGES])
+    fig_avg.update_layout(
+        title=f"Net APY trung bình theo ngày từ {start_date} đến {end_date}",
+        yaxis_title="Net APY (%)",
+        xaxis_title="Ngày"
+    )
+    st.plotly_chart(fig_avg, use_container_width=True)
+else:
+    st.info("Không có dữ liệu trong khoảng thời gian này.")
