@@ -88,8 +88,11 @@ def highlight_negative(val):
     return "color: black"
 
 with tab_all:
+    # Sắp xếp từ mới nhất đến cũ nhất
+    df_display_sorted = df_display.sort_values("createdOn", ascending=False)
+    
     st.dataframe(
-        df_display.style.applymap(
+        df_display_sorted.style.applymap(
             highlight_negative,
             subset=[f"net_apy_x{lev}" for lev in LEVERAGES]
         ),
