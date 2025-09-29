@@ -184,36 +184,85 @@ st.markdown("### Giá SOL")
 start_sol_price = st.number_input(f"Giá SOL lúc {start_profit_date}", min_value=0.0, value=20.0, step=0.01)
 end_sol_price = st.number_input(f"Giá SOL lúc {end_profit_date}", min_value=0.0, value=20.0, step=0.01)
 
-# APY trung bình SOL (linear giả định 20%)
+# APY trung bình SOL
 apy_sol = st.number_input("APY trung bình của SOL (%)", min_value=0.0, value=20.0, step=0.1) / 100.0
+
+# Vốn đầu tư ban đầu
+initial_investment = st.number_input("Số vốn đầu tư ban đầu (USD)", min_value=0.0, value=2500.0, step=100.0)
 
 # Tính APY trung bình JLP trong khoảng ngày profit
 mask_profit = (df["createdOn"].dt.date >= start_profit_date) & (df["createdOn"].dt.date <= end_profit_date)
 df_profit_period = df.loc[mask_profit].copy()
 
 if not df_profit_period.empty:
+    # Tính APY trung bình cho từng leverage
     avg_net_apy_profit = {}
     for lev in LEVERAGES:
         avg_val = df_profit_period[f"net_apy_x{lev}"].mean() * 100
         avg_net_apy_profit[f"x{lev}"] = round(avg_val, 2)
 
-    # Tính lợi nhuận cuối kỳ = price change * (1 + APY)
+    # Tính lợi nhuận cuối kỳ
     profits = {}
-    labels = {}
+    df_profit = pd.DataFrame(columns=["Asset", "FinalValue", "ProfitUSD", "ProfitPct", "APY"])
+
+    # JLP theo từng leverage
     for lev in LEVERAGES:
-        profits[f"JLP x{lev}"] = (end_jlp_price / start_jlp_price) * (1 + avg_net_apy_profit[f"x{lev}"]/100)
-        labels[f"JLP x{lev}"] = f"{profits[f'JLP x{lev}']:.2f} (APY {avg_net_apy_profit[f'x{lev}']:.2f}%)"
-    profits["SOL"] = (end_sol_price / start_sol_price) * (1 + apy_sol)
-    labels["SOL"] = f"{profits['SOL']:.2f} (APY {apy_sol*100:.2f}%)"
+        apy_val = avg_net_apy_profit[f"x{lev}"]
+        growth_factor = (end_jlp_price / start_jlp_price) * (1 + apy_val/100)
+        final_value = initial_investment * growth_factor
+        profit_usd = final_value - initial_investment
+        profit_pct = (profit_usd / initial_investment) * 100
 
-    df_profit = pd.DataFrame({"Asset": list(profits.keys()), "Return": list(profits.values()), "Label": list(labels.values())})
+        df_profit.loc[len(df_profit)] = [
+            f"JLP x{lev}",
+            final_value,
+            profit_usd,
+            profit_pct,
+            apy_val
+        ]
 
-    fig_profit = px.bar(df_profit, x="Asset", y="Return", text="Label")
+    # SOL
+    growth_factor_sol = (end_sol_price / start_sol_price) * (1 + apy_sol)
+    final_value_sol = initial_investment * growth_factor_sol
+    profit_usd_sol = final_value_sol - initial_investment
+    profit_pct_sol = (profit_usd_sol / initial_investment) * 100
+
+    df_profit.loc[len(df_profit)] = [
+        "SOL",
+        final_value_sol,
+        profit_usd_sol,
+        profit_pct_sol,
+        apy_sol * 100
+    ]
+
+    # Tạo label để vẽ chart
+    df_profit["Label"] = df_profit.apply(
+        lambda row: f"APY {row['APY']:.2f}%\n+${row['ProfitUSD']:,.2f}\n({row['ProfitPct']:.2f}%)",
+        axis=1
+    )
+
+    # Vẽ bar chart
+    fig_profit = px.bar(
+        df_profit,
+        x="Asset",
+        y="FinalValue",
+        text="Label"
+    )
     fig_profit.update_traces(textposition="outside")
     fig_profit.update_layout(
-        title=f"Lợi nhuận từ {start_profit_date} đến {end_profit_date}",
-        yaxis_title="Tỷ lệ lợi nhuận"
+        title=f"Kết quả đầu tư {initial_investment:,.0f} USD từ {start_profit_date} đến {end_profit_date}",
+        yaxis_title="Giá trị cuối kỳ (USD)"
     )
     st.plotly_chart(fig_profit, use_container_width=True)
+
+    # Hiển thị bảng so sánh
+    st.markdown("### 📋 Bảng so sánh chi tiết")
+    df_show = df_profit.copy()
+    df_show["FinalValue"] = df_show["FinalValue"].map(lambda x: f"${x:,.2f}")
+    df_show["ProfitUSD"] = df_show["ProfitUSD"].map(lambda x: f"${x:,.2f}")
+    df_show["ProfitPct"] = df_show["ProfitPct"].map(lambda x: f"{x:.2f}%")
+    df_show["APY"] = df_show["APY"].map(lambda x: f"{x:.2f}%")
+    st.table(df_show[["Asset", "APY", "FinalValue", "ProfitUSD", "ProfitPct"]])
+
 else:
     st.info("Không có dữ liệu JLP trong khoảng thời gian này để tính APY trung bình.")
