@@ -199,15 +199,21 @@ if not df_profit_period.empty:
 
     # Tính lợi nhuận cuối kỳ = price change * (1 + APY)
     profits = {}
+    labels = {}
     for lev in LEVERAGES:
         profits[f"JLP x{lev}"] = (end_jlp_price / start_jlp_price) * (1 + avg_net_apy_profit[f"x{lev}"]/100)
+        labels[f"JLP x{lev}"] = f"{profits[f'JLP x{lev}']:.2f} (APY {avg_net_apy_profit[f'x{lev}']:.2f}%)"
     profits["SOL"] = (end_sol_price / start_sol_price) * (1 + apy_sol)
+    labels["SOL"] = f"{profits['SOL']:.2f} (APY {apy_sol*100:.2f}%)"
 
-    df_profit = pd.DataFrame({"Asset": list(profits.keys()), "Return": list(profits.values())})
+    df_profit = pd.DataFrame({"Asset": list(profits.keys()), "Return": list(profits.values()), "Label": list(labels.values())})
 
-    fig_profit = px.bar(df_profit, x="Asset", y="Return", text="Return")
-    fig_profit.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-    fig_profit.update_layout(title=f"Lợi nhuận từ {start_profit_date} đến {end_profit_date}", yaxis_title="Tỷ lệ lợi nhuận")
+    fig_profit = px.bar(df_profit, x="Asset", y="Return", text="Label")
+    fig_profit.update_traces(textposition="outside")
+    fig_profit.update_layout(
+        title=f"Lợi nhuận từ {start_profit_date} đến {end_profit_date}",
+        yaxis_title="Tỷ lệ lợi nhuận"
+    )
     st.plotly_chart(fig_profit, use_container_width=True)
 else:
     st.info("Không có dữ liệu JLP trong khoảng thời gian này để tính APY trung bình.")
