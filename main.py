@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import plotly.express as px
 from datetime import date, timedelta
+from decimal import Decimal, getcontext
 
 # ========== CONFIG ==========
 # Ngày hôm nay
@@ -266,3 +267,34 @@ if not df_profit_period.empty:
 
 else:
     st.info("Không có dữ liệu JLP trong khoảng thời gian này để tính APY trung bình.")
+
+# set precision cao
+getcontext().prec = 28
+
+# ========== LIQUIDATION CALCULATOR ==========
+st.subheader("🔻 Liquidation Price Calculator (JupiterLend precision)")
+
+# Input
+col1, col2, col3 = st.columns(3)
+with col1:
+    current_price = Decimal(str(st.number_input("Giá hiện tại JLP (USDC)", min_value=0.0, value=5.575, step=0.001)))
+with col2:
+    leverage = Decimal(str(st.slider("Đòn bẩy (x)", min_value=1.0, max_value=7.0, value=3.7, step=0.1)))
+with col3:
+    max_ltv = Decimal(str(st.number_input("Max LTV (%)", min_value=1.0, max_value=100.0, value=88.0, step=0.1)))
+
+# Tính LTV hiện tại theo leverage
+ltv_current = (leverage - Decimal(1)) / leverage * Decimal(100)
+
+# Công thức liquidation
+liq_price = current_price * (ltv_current / max_ltv)
+drop_pct = (Decimal(1) - liq_price / current_price) * Decimal(100)
+
+# Hiển thị kết quả
+st.markdown("### 📉 Kết quả")
+st.write(f"**Giá hiện tại JLP:** ${current_price:.4f}")
+st.write(f"**Đòn bẩy:** x{leverage:.2f}")
+st.write(f"**Max LTV:** {max_ltv:.2f}%")
+st.write(f"**LTV hiện tại:** {ltv_current:.2f}% (auto)")
+st.write(f"👉 **Giá thanh lý:** ${liq_price:.4f}")
+st.write(f"👉 **% giảm so với hiện tại:** {drop_pct:.2f}%")
